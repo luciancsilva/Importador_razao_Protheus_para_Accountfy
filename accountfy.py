@@ -165,14 +165,14 @@ df = pd.concat([df_tecadi, df_dagnoni], ignore_index=True)
 # **Atenção:** Executar apenas se for necessário trazer esses lançamentos, do contrário passar para o próximo passo.
 
 # %%
-# Ler SA2 para dados dos fornecedores
+# Ler SA2 pulando 2 primeiras linhas
 sa2 = pd.read_csv(sa2_filename, sep=';', encoding='latin-1', quotechar='"', skiprows=2, low_memory=False)
 
 # Ler SC7 pulando 2 primeiras linhas
 sc7 = pd.read_csv(sc7_filename, sep=';', encoding='latin-1', quotechar='"', skiprows=2, low_memory=False)
 
 # Remove linhas com dados na coluna extra e reseta o índice
-sa2 = sa2[sa2['Unnamed: 2'].isna()].reset_index(drop=True)
+#sa2 = sa2[sa2['Unnamed: 2'].isna()].reset_index(drop=True)
 
 # Remove zeros à esquerda do código do fornecedor
 sa2['Codigo'] = sa2['Codigo'].str.lstrip('0')
@@ -219,8 +219,8 @@ if sc7_aprovados:
             'D/C': 'D',
             'Hist Lanc': 'Pedido ' + sc7_aprovados_df.apply(lambda x: formatar_pedido(x['Filial'], x['Numero PC']), axis=1) + ' aprovado e não recebido.',
             'Data Lcto': sc7_aprovados_df['Dt. Entrega'],
-            'Centro de custo': sc7_aprovados_df['Centro Custo'],
-            'Filial Orig': sc7_aprovados_df['Filial'],
+            'Centro de custo': sc7_aprovados_df['Centro Custo'].apply(lambda x: f'0{int(x)}' if pd.notnull(x) else ''),
+            'Cod filial': sc7_aprovados_df['Filial'],
             'Obs': sc7_aprovados_df['Fornecedor'].map(dict(zip(sa2['Codigo'], sa2['Razao Social']))).fillna('Fornecedor não encontrado')
         })
 
@@ -236,8 +236,8 @@ if sc7_aprovados:
             df['Conta'] = df['Conta'].astype(str)
     else:
         # Se o DataFrame estiver vazio, cria um DataFrame vazio com as colunas necessárias
-        df_sc7_aprovados = pd.DataFrame(columns=['Conta', 'Valor', 'D/C', 'Hist Lanc', 'Data Lcto', 'Centro de custo', 'Filial Orig', 'Obs'])
-        df_sc7_piscofins_aprovados = pd.DataFrame(columns=['Conta', 'Valor', 'D/C', 'Hist Lanc', 'Data Lcto', 'Centro de custo', 'Filial Orig', 'Obs'])
+        df_sc7_aprovados = pd.DataFrame(columns=['Conta', 'Valor', 'D/C', 'Hist Lanc', 'Data Lcto', 'Centro de custo', 'Cod filial', 'Obs'])
+        df_sc7_piscofins_aprovados = pd.DataFrame(columns=['Conta', 'Valor', 'D/C', 'Hist Lanc', 'Data Lcto', 'Centro de custo', 'Cod filial', 'Obs'])
 
 # Criar lançamentos de débito da SC7 (em aprovação)
 if sc7_em_aprovacao:
@@ -248,8 +248,8 @@ if sc7_em_aprovacao:
             'D/C': 'D',
             'Hist Lanc': 'Pedido ' + sc7_em_aprovacao_df.apply(lambda x: formatar_pedido(x['Filial'], x['Numero PC']), axis=1) + ' em aprovação.',
             'Data Lcto': sc7_em_aprovacao_df['Dt. Entrega'],
-            'Centro de custo': sc7_em_aprovacao_df['Centro Custo'],
-            'Filial Orig': sc7_em_aprovacao_df['Filial'],
+            'Centro de custo': sc7_em_aprovacao_df['Centro Custo'].apply(lambda x: f'0{int(x)}' if pd.notnull(x) else ''),
+            'Cod filial': sc7_em_aprovacao_df['Filial'],
             'Obs': sc7_em_aprovacao_df['Fornecedor'].map(dict(zip(sa2['Codigo'], sa2['Razao Social']))).fillna('Fornecedor não encontrado')
         })
 
@@ -265,8 +265,8 @@ if sc7_em_aprovacao:
             df['Conta'] = df['Conta'].astype(str)
     else:
         # Se o DataFrame estiver vazio, cria um DataFrame vazio com as colunas necessárias
-        df_sc7_em_aprovacao = pd.DataFrame(columns=['Conta', 'Valor', 'D/C', 'Hist Lanc', 'Data Lcto', 'Centro de custo', 'Filial Orig', 'Obs'])
-        df_sc7_piscofins_em_aprovacao = pd.DataFrame(columns=['Conta', 'Valor', 'D/C', 'Hist Lanc', 'Data Lcto', 'Centro de custo', 'Filial Orig', 'Obs'])
+        df_sc7_em_aprovacao = pd.DataFrame(columns=['Conta', 'Valor', 'D/C', 'Hist Lanc', 'Data Lcto', 'Centro de custo', 'Cod filial', 'Obs'])
+        df_sc7_piscofins_em_aprovacao = pd.DataFrame(columns=['Conta', 'Valor', 'D/C', 'Hist Lanc', 'Data Lcto', 'Centro de custo', 'Cod Filial', 'Obs'])
 
 # Concatenar os dados da SC7 com DataFrame principal
 df_list = [df_tecadi, df_dagnoni]
@@ -620,6 +620,16 @@ if novos_lancamentos:
 # ## Gerar os lançamentos de zeramento da base
 
 # %%
+# Definir as contas específicas que devem ser mantidas mesmo começando com 1 ou 2
+contas_excecao = ['2303010996', '2303010997', '2303010998', '2303010999']
+
+# Manter todas as contas que NÃO começam com 1 ou 2 OU estão na lista de exceções
+df = df[
+    (~df['Conta'].str.startswith(('1', '2'))) |  # Não começa com 1 ou 2
+    (df['Conta'].isin(contas_excecao))           # OU está na lista de exceções
+]
+
+## Gerar os lançamentos de zeramento
 def create_zeramento_df(df_input):
     filial_df = df_input.copy()
     # Converte todos os códigos de filial para string
