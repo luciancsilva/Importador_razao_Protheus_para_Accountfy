@@ -102,6 +102,8 @@ import shutil
 # ## Converter os lançamentos da CT2 (Lançamentos contábeis)
 
 # %%
+RH / Folha de pagamento
+
 def process_ct2(filename):
     # Ler CT2 pulando 2 primeiras linhas
     df = pd.read_csv(filename, sep=';', encoding='latin-1', quotechar='"', skiprows=2, low_memory=False)
@@ -141,6 +143,9 @@ def process_ct2(filename):
     df['Hist Lanc'] = df['Hist Lanc'].str.replace(r' - .+$', '', regex=True)
     df['Obs'] = df['Obs'].fillna('')
     df['Hist Lanc'] = df['Hist Lanc'].str.replace(' - ', '')
+
+    # Ajustar histórico para lançamentos do RH
+    df.loc[df['Origem'] == 'CTBA500', 'Hist Lanc'] = 'RH / Folha de pagamento'
     
     return df
 
@@ -692,6 +697,7 @@ df.loc[(df['Conta'].astype(str).str.match(r'^[34789]\d{9}$')) |
 # Ajustar DE-PARA das contas da ADM
 df['Conta'] = df['Conta'].replace('6101010110', '6101010231')
 df['Conta'] = df['Conta'].replace('6101010101', '6101010213')
+df['Conta'] = df['Conta'].replace('6101010201', '6101010301')
 
 # Ler plano de contas pulando 3 primeiras linhas
 plano_contas = pd.read_excel(plano_filename, sheet_name='CONTAS_CONTABEIS', skiprows=3)
