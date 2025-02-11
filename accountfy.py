@@ -102,8 +102,6 @@ import shutil
 # ## Converter os lançamentos da CT2 (Lançamentos contábeis)
 
 # %%
-RH / Folha de pagamento
-
 def process_ct2(filename):
     # Ler CT2 pulando 2 primeiras linhas
     df = pd.read_csv(filename, sep=';', encoding='latin-1', quotechar='"', skiprows=2, low_memory=False)
