@@ -143,7 +143,7 @@ def process_ct2(filename):
     df['Hist Lanc'] = df['Hist Lanc'].str.replace(' - ', '')
 
     # Ajustar histórico para lançamentos do RH
-    df.loc[df['Origem'] == 'CTBA500', 'Hist Lanc'] = 'RH / Folha de pagamento'
+    df.loc[df['Rotina'] == 'CTBA500', 'Obs'] = 'RH / Folha de pagamento'
     
     return df
 
