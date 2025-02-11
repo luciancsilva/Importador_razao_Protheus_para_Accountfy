@@ -713,15 +713,19 @@ df = df[columns_to_keep]
 sao_paulo_tz = pytz.timezone('America/Sao_Paulo')
 current_datetime = datetime.now(sao_paulo_tz).strftime('%Y%m%d_%Hh%M')
 
+# Extrair mês e ano do dataframe
+data_ref = pd.to_datetime(df['Data Lcto'].max())
+month_year = data_ref.strftime('%Y%m')
+
 # Criar estrutura de pastas
 base_dir = 'Output'
-date_dir = os.path.join(base_dir, current_datetime)
+month_dir = os.path.join(base_dir, month_year)
+date_dir = os.path.join(month_dir, current_datetime)
 
 # Criar diretórios
-if not os.path.exists(base_dir):
-   os.makedirs(base_dir)
-if not os.path.exists(date_dir):
-   os.makedirs(date_dir)
+for dir_path in [base_dir, month_dir, date_dir]:
+   if not os.path.exists(dir_path):
+       os.makedirs(dir_path)
 
 # Salvar arquivo de output
 output_filename = f'{current_datetime}_importacao_accountfy.xlsx'
