@@ -692,10 +692,20 @@ df.loc[(df['Conta'].astype(str).str.match(r'^[34789]\d{9}$')) |
        (df['Centro de custo'].isna()) | 
        (df['Centro de custo'] == ''), 'Centro de custo'] = '999999'
 
+# DE-PARA das contas da ADM (Patrimonial)
+de_para_contas = {
+    '6101010110': '6101010231',
+    '6101010101': '6101010213',
+    '6101010201': '6101010301'
+}
+
+# Aplicar DE-PARA somente quando a Filial for "ADM"
+df.loc[df['Cod filial'] == "ADM", 'Conta'] = df['Conta'].replace(de_para_contas)
+
 # Ajustar DE-PARA das contas da ADM
-df['Conta'] = df['Conta'].replace('6101010110', '6101010231')
-df['Conta'] = df['Conta'].replace('6101010101', '6101010213')
-df['Conta'] = df['Conta'].replace('6101010201', '6101010301')
+#df['Conta'] = df['Conta'].replace('6101010110', '6101010231')
+#df['Conta'] = df['Conta'].replace('6101010101', '6101010213')
+#df['Conta'] = df['Conta'].replace('6101010201', '6101010301')
 
 # Ler plano de contas pulando 3 primeiras linhas
 plano_contas = pd.read_excel(plano_filename, sheet_name='CONTAS_CONTABEIS', skiprows=3)
