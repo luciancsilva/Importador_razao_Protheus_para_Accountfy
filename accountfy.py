@@ -63,7 +63,8 @@ aliquota_iss = {
    "108":   0.02,
    "109":   0.02,
    "114":   0.025,
-   "115":   0.02
+   "115":   0.02,
+   "101":   0.00
 }
 
 # Nome das filiais assim como no Accountfy
@@ -325,10 +326,20 @@ except FileNotFoundError:
 # Migrar os lançamentos das contas que começam com 7, 8 ou 9 para a filial 101, exceto quando for ADM
 df.loc[(df['Conta'].str.startswith(('7', '8', '9'))) & (df['Cod filial'] != 'ADM'), 'Cod filial'] = '101'
 
+# Garantir que as colunas sejam do tipo string (caso não sejam)
+df['Conta'] = df['Conta'].astype(str)
+df['Cod filial'] = df['Cod filial'].astype(str)
+
+# Ajuste para a conta 4101010201 quando a filial for 101
+df.loc[
+    (df['Cod filial'] == '101') & 
+    (df['Conta'] == '4101010201'), 
+    'Cod filial'
+] = '107TR'
+
 # %% [markdown]
 # ## Gerar o rateio da patrimonial (Dagnoni) nas unidades operacionais
 
-# %%
 # Ler arquivo de parâmetros de rateio 
 rateio_patrimonial = pd.read_excel(parametros_rateio_patrimonial_filename)
 
@@ -375,6 +386,7 @@ for _, row in rateio_patrimonial.iterrows():
        # Lançamentos na 5301010901 - Resultado da equivalência patrimonial (Dagnoni)
        valor_rateio = valor_total * percentuais[_]
        if valor_rateio != 0:
+           # Lançamento na filial destino
            novos_lancamentos.extend([
                {
                    'Conta': '5301010901',
@@ -387,10 +399,25 @@ for _, row in rateio_patrimonial.iterrows():
                    'Obs': 'Lançamento automático'
                }
            ])
+           
+           # Lançamento inverso na filial ADM
+           novos_lancamentos.extend([
+               {
+                   'Conta': '5301010901',
+                   'Valor': abs(valor_rateio),
+                   'D/C': 'C' if valor_rateio > 0 else 'D',  # Invertido
+                   'Hist Lanc': f'(Rateio patrimonial) Rateio da patrimonial para a filial {row["Filial"]}',
+                   'Data Lcto': data_mais_recente,
+                   'Centro de custo': '999999',
+                   'Cod filial': 'ADM',  # Sempre ADM
+                   'Obs': 'Lançamento automático - contrapartida'
+               }
+           ])
        
        # Lançamentos na 2303010998 - ( - ) Depreciação / Amortização (Rateio patrimonial)
        valor_rateio_2 = valor_total_2 * percentuais[_]
        if valor_rateio_2 != 0:
+           # Lançamento na filial destino
            novos_lancamentos.extend([
                {
                    'Conta': '2303010998',
@@ -403,10 +430,25 @@ for _, row in rateio_patrimonial.iterrows():
                    'Obs': 'Lançamento automático'
                }
            ])
+           
+           # Lançamento inverso na filial ADM
+           novos_lancamentos.extend([
+               {
+                   'Conta': '2303010998',
+                   'Valor': abs(valor_rateio_2),
+                   'D/C': 'C' if valor_rateio_2 > 0 else 'D',  # Invertido
+                   'Hist Lanc': f'(Rateio patrimonial) Rateio da patrimonial para a filial {row["Filial"]}',
+                   'Data Lcto': data_mais_recente,
+                   'Centro de custo': '999999',
+                   'Cod filial': 'ADM',  # Sempre ADM
+                   'Obs': 'Lançamento automático - contrapartida'
+               }
+           ])
         
         # Lançamentos na 2303010997 - ( - ) Resultado financeiro / IR / CSLL (Rateio patrimonial)
        valor_rateio_3 = valor_total_3 * percentuais[_]
        if valor_rateio_3 != 0:
+           # Lançamento na filial destino
            novos_lancamentos.extend([
                {
                    'Conta': '2303010997',
@@ -417,6 +459,20 @@ for _, row in rateio_patrimonial.iterrows():
                    'Centro de custo': '999999',
                    'Cod filial': row['Cod filial'],
                    'Obs': 'Lançamento automático'
+               }
+           ])
+           
+           # Lançamento inverso na filial ADM
+           novos_lancamentos.extend([
+               {
+                   'Conta': '2303010997',
+                   'Valor': abs(valor_rateio_3),
+                   'D/C': 'C' if valor_rateio_3 > 0 else 'D',  # Invertido
+                   'Hist Lanc': f'(Rateio patrimonial) Rateio da patrimonial para a filial {row["Filial"]}',
+                   'Data Lcto': data_mais_recente,
+                   'Centro de custo': '999999',
+                   'Cod filial': 'ADM',  # Sempre ADM
+                   'Obs': 'Lançamento automático - contrapartida'
                }
            ])
 
@@ -687,16 +743,27 @@ if not zeramento_df.empty:
 # ## Gerar o arquivo de importação
 
 # %%
+
 # Adicionar lógica para Centro de custo padrão para contas do grupo 3, 4, 7, 8 e 9 e valores vazios/NaN
-df.loc[(df['Conta'].astype(str).str.match(r'^[34789]\d{9}$')) | 
-       (df['Centro de custo'].isna()) | 
-       (df['Centro de custo'] == ''), 'Centro de custo'] = '999999'
+#df.loc[(df['Conta'].astype(str).str.match(r'^[34789]\d{9}$')) | 
+#       (df['Centro de custo'].isna()) | 
+#       (df['Centro de custo'] == ''), 'Centro de custo'] = '999999'
+
+# Adicionar lógica para Centro de Custo padrão para contas do grupo 3, 4, 7, 8 e 9, valores vazios/NaN, e contas específicas
+df.loc[
+    (df['Conta'].astype(str).str.match(r'^[34789]\d{9}$')) | 
+    (df['Centro de custo'].isna()) | 
+    (df['Centro de custo'] == '') | 
+    (df['Conta'].isin(['2303010996', '2303010998', '5101010112', '5201010115', '6101010231'])),
+    'Centro de custo'
+] = '999999'
 
 # DE-PARA das contas da ADM (Patrimonial)
 de_para_contas = {
     '6101010110': '6101010231',
     '6101010101': '6101010213',
-    '6101010201': '6101010301'
+    '6101010201': '6101010301',
+    '6101010103': '6101010237'
 }
 
 # Aplicar DE-PARA somente quando a Filial for "ADM"
